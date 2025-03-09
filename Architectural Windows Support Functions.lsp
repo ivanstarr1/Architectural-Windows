@@ -4,7 +4,6 @@
 	(setq TEMPSNAPMODESAVE (getvar "OSMODE"))
 	(setvar "OSMODE" 0)
 	
-
 ) ; defun
 
 
@@ -42,14 +41,6 @@
 	(setq 4sp3DWCSPts (MMult EntECS 4sp2DECSPts))
 	(setq 3sp3DWCSPts (4sp->3sp 4sp3DWCSPts))
 	
-) ; defun
-
-
-(defun Draw3spPoints (3spPoints / Ctr NumPts)
-	(command ".line" (car 3spPoints))
-	(setq 3spPoints (cdr 3spPoints))
-	(foreach pt 3spPoints (command pt))
-	(command "")
 ) ; defun
 
 
@@ -445,24 +436,6 @@
 ) ; defun
 
 
-(defun U0 ()
-	(command "ucs" "")
-) ; defun
-
-
-(defun UM (Pt)
-	(command ".ucs" "m" Pt)
-) ; defun
-
-
-(defun U3 (P1 P2 P3)
-	(command ".ucs" "3" P1 P2 P3)
-) ; defun
-
-
-(defun UP ()
-	(command "ucs" "p")
-) ; defun
 
 
 (defun CreateDictionary (/ Dict)
@@ -490,3 +463,191 @@
 ) ; defun
 
 
+(defun PrintSymbolList (SymbolList / Item) ; Note: I tink this can only handle atom dita types
+
+	(foreach Item SymbolList
+		(prin1 Item)
+		(princ "\n")
+	)
+
+
+) ; defun
+
+
+(defun ZRotate4Sp (Ang)
+
+	(list
+		(list (cos Ang) (- (sin Ang)) 0 0)
+		(list (sin Ang) (cos Ang)     0 0)
+		(list 0         0             1 0)
+		(list 0         0             0 1)
+	) ; list
+
+) ; defun
+
+
+
+(defun XCoord (Vect)
+	(nth 0 Vect)
+) ; defun
+
+(defun YCoord (Vect)
+	(nth 1 Vect)
+) ; defun
+
+(defun ZCoord (Vect)
+	(nth 2 Vect)
+) ; defun
+
+(defun Offset4Sp (3SpVect)
+
+	(list
+		(list 1 0 0 (XCoord 3SpVect))
+		(list 0 1 0 (YCoord 3SpVect))
+		(list 0 0 1 (ZCoord 3SpVect))
+		(list 0 0 0 1)
+	) ; list
+
+) ; defun
+
+
+(defun UCSFromTransformMatrix (XFormMatrix)
+
+	(setq 3DVects (4Sp->3Sp XFormMatrix))
+	(setq XHat (nth 0 3DVects))
+	(setq YHat (nth 1 3DVects))
+	(setq ZHat (nth 2 3DVects))
+	(setq Offset (nth 3 3DVects))
+
+	(U3 Offset (VAdd Offset XHat) (VAdd Offset YHat))
+
+) ; defun
+
+
+(defun c:UM ()
+	(UM (getpoint "\nNew UCS origin:"))
+) ; defun
+
+(defun c:U0 ()
+	(U0)
+) ; defun
+
+(defun c:UE ( / Ent)
+	(setq Ent (entsel))
+	(UE Ent)
+) ; defun
+
+(defun c:UP ()
+	(UP)
+) ; defun
+
+(defun c:UX ()
+	(UX)
+) ; defun
+
+(defun c:UY ()
+	(UY)
+) ; defun
+
+(defun c:UZ ()
+	(UZ)
+) ; defun
+
+
+(defun c:U3 ()
+	(command ".ucs" "3")
+) ; defun
+
+
+(defun U3 (P1 P2 P3)
+	(command ".ucs" "3" P1 P2 P3)
+) ; defun
+
+(defun UX ()
+	(command ".ucs" "x" "90")
+) ; defun
+
+(defun UY ()
+	(command ".ucs" "y" "90")
+) ; defun
+
+(defun UZ ()
+	(command ".ucs" "z" "90")
+) ; defun
+
+
+(defun U0 ()
+	(command "ucs" "")
+) ; defun
+
+
+(defun UM (Pt)
+	(command ".ucs" "m" Pt)
+) ; defun
+
+
+(defun U3 (P1 P2 P3)
+	(command ".ucs" "3" P1 P2 P3)
+) ; defun
+
+
+(defun UP ()
+	(command "ucs" "p")
+) ; defun
+
+
+(defun ZRotate4Sp (Ang)
+
+	(list
+		(list (cos Ang) (- (sin Ang)) 0 0)
+		(list (sin Ang) (cos Ang)     0 0)
+		(list 0         0             1 0)
+		(list 0         0             0 1)
+	) ; list
+
+) ; defun
+
+
+(defun Draw3spPoints (3spPoints bClose / Ctr NumPts)
+	(command ".line" (car 3spPoints))
+	(setq 3spPoints (cdr 3spPoints))
+	(foreach pt 3spPoints (command pt))
+	(command (if bClose "c" ""))
+) ; defun
+
+
+(defun Print4xNMatrix (4x4Matrix LowerLeftPoint / CurrX CurrY TextSize HorizSpacing VertSpacing
+											 Ctr Line NumCols Ctr2 CloseParenPoint OpenParenPoint OpenParenXCoord)
+
+	(setq 4x4Matrix (reverse 4x4Matrix))
+	(setq CurrX (XCoord LowerLeftPoint))
+	(setq CurrY (YCoord LowerLeftPoint))
+	(setq TextSize (getvar "TextSize"))
+	(setq HorizSpacing (* 8 TextSize))
+	(setq VertSpacing (* 1.5 TextSize))
+	(setq Ctr 0)
+	(while (< Ctr 4)
+		(setq Line (nth Ctr 4x4Matrix))
+		(setq NumCols (length Line))
+		(setq Ctr2 0)
+		(while (< Ctr2 NumCols)
+			
+			(command "text" "s" "Monotxt" "s" "Monotxt" "j" "Left" (list CurrX CurrY 0) TextSize 0 (rtos (nth Ctr2 Line) 2 3))
+			(setq CurrX (+ CurrX HorizSpacing))
+			(setq LastCurrX CurrX)
+			(setq Ctr2 (1+ Ctr2))
+		) ; while
+		(setq CurrY (+ CurrY VertSpacing))
+		(setq CurrX (XCoord LowerLeftPoint))
+		(setq Ctr (1+ Ctr))
+	) ; while
+	(setq CloseParenPoint (list LastCurrX (YCoord LowerLeftPoint) 0))
+	(command "text" "s" "Monotxt" "s" "Monotxt" "j" "Left" CloseParenPoint (* TextSize 6)  0 ")")
+	(setq OpenParenXCoord (- (XCoord LowerLeftPoint) (* HorizSpacing 0.3)))
+	(setq OpenParenPoint (list OpenParenXCoord (YCoord LowerLeftPoint) 0))
+	(command "text" "s" "Monotxt" "s" "Monotxt" "j" "Left" OpenParenPoint (* TextSize 6) 0 "(")
+	(setvar "textsize" TextSize)
+
+	CloseParenPoint
+
+) ; defun

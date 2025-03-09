@@ -2,7 +2,7 @@
 
 ; All 3DSolid wall objects must be on a layer "Walls"
 
-(if (= VAdd nil) (load (findfile "Architectural Windows Support Functions")))
+(if (= VAdd nil) (load "C:\\Users\\ivans\\OneDrive\\Documents\\GitHub\\Architectural Windows\\Architectural Windows Support Functions"))
 
 (setq WINDOWFRAMETHICKNESS 7)
 (setq WINDOWFRAMEHEIGHT 9)
@@ -12,6 +12,46 @@
 (setq WALLLAYER "Walls")
 (setq MAXWALLTHICKNESS 40)
 
+(defun AddWindow ()
+
+	(ToggleSnapsOn)
+	(initget 8 "Rectangle")
+	(setq Ans3 (getpoint "\nFirst corner of window or pick Rectangle [Rectangle] <Rectangle>: "))
+	(ToggleSnapsOff)
+	(if (or (= Ans3 "Rectangle") (= Ans3 nil))
+		(progn
+			(setq PlRect (car (entsel "\mPick a polyline rectangle: ")))
+			(if PlRect
+				(if (= (cdr (assoc 0 (entget PlRect))) "LWPOLYLINE")
+					(progn
+						(CreateNewWindowFromRectInWall PLRect)
+						; Put the ID in the WindowDictionary
+						(initget 8 "Yes No")
+						(setq YesNoAns (getkword "\nDelete rectangle? [Yes/No] <Yes>: "))
+						(if (or (= YesNoAns "Yes") (= YesNoAns nil)) 
+							(entdel PlRect)
+						) ; if
+					) ; progn
+					(alert "Entity is not a pline")
+				) ; if
+				(alert "No entity selected")
+			) ; if
+
+		) ; progn
+	) ; if
+	(if (= (type Ans3) 'LIST) ; Then it's the first point of a new rectangle for a new window
+		(progn
+			(command ".rectang" Ans3)
+			(ToggleSnapsOn)
+			(command Pause)
+			(ToggleSnapsOff)
+			(setq DefiningRectangle (entlast))
+			(CreateNewWindowFromRectInWall (entlast))
+			(command ".erase" DefiningRectangle "")
+		) ; progn
+	) ; if
+	
+) ; defun
 
 ; This here is the top-level (main) function that defines the Window command
 (defun c:Window ()
@@ -34,106 +74,16 @@
 		) ; setq
 
 		(if (or (= Ans "New") (= Ans nil))  ; OK a new window is about to be created
-			(progn
-				(ToggleSnapsOn)
-				(initget 8 "Rectangle")
-				(setq Ans3 (getpoint "\nFirst corner of window or pick Rectangle [Rectangle] <Rectangle>: "))
-				(ToggleSnapsOff)
-				(if (or (= Ans3 "Rectangle") (= Ans3 nil))
-					(progn
-						(setq PlRect (car (entsel "\mPick a polyline rectangle: ")))
-						(if PlRect
-							(if (= (cdr (assoc 0 (entget PlRect))) "LWPOLYLINE")
-								(progn
-									(CreateNewWindowFromRectInWall PLRect)
-									; Put the ID in the WindowDictionary
-									(initget 8 "Yes No")
-									(setq YesNoAns (getkword "\nDelete rectangle? [Yes/No] <Yes>: "))
-									(if (or (= YesNoAns "Yes") (= YesNoAns nil)) 
-										(entdel PlRect)
-									) ; if
-								) ; progn
-								(alert "Entity is not a pline")
-							) ; if
-							(alert "No entity selected")
-						) ; if
-	
-					) ; progn
-				) ; if
-				(if (= (type Ans3) 'LIST) ; Then it's the first point of a new rectangle for a new window
-					(progn
-						(command ".rectang" Ans3)
-						(ToggleSnapsOn)
-						(command Pause)
-						(ToggleSnapsOff)
-						(setq DefiningRectangle (entlast))
-						(CreateNewWindowFromRectInWall (entlast))
-						(command ".erase" DefiningRectangle "")
-					) ; progn
-				) ; if
-			) ; progn
+			(AddWindow)
 		) ; if
 
 		(if (= Ans "Adjust") ; If it's a window to adjust or delete
-			(progn
-				(setq PossWindowEnt (car (entsel "\nSelect window:")))
-				(if PossWindowEnt
-					(progn
-						(setq PossWDDKey (IsEntityPartOfAWindow PossWindowEnt)) ; check to see if it really is a window ;XXX2
-						(if PossWDDKey 
-							(progn ; It is a window entity, so the PossWDDKey IS a WDDKEY
-								(setq WDDKey PossWDDKey)
-								(setq WindowDict (cdr (assoc -1 (dictsearch WINDOWDICTIONARYDICTIONARY WDDKey))))
-								(SetUCSToWindowCS WindowDict)
-								(setq Continue2 t)
-								(while Continue2
-									(ToggleSnapsOn)
-									(initget 8 "eXit")
-									(setq PossInputPoint (getpoint "n\Enter another point to adjust the corners of this window or eXit [eXit] <eXit>:"))
-									(ToggleSnapsOff)
-									(if (or (= PossInputPoint "eXit" ) (= PossInputPoint nil))
-										(setq Continue2 nil)
-									) ; if
-									(if (= (type PossInputPoint) 'LIST)
-										(progn
-											(setq OldWindowDict (cdr (assoc -1 (dictsearch WINDOWDICTIONARYDICTIONARY WDDKey))))
-											(setq NewWindowDict (AdjustWindow OldWindowDict (trans PossInputPoint 1 0 nil)))
-											(vlax-ldata-put NewWindowDict "Id" WDDKey)
-											(DeleteWindowAndWindowDictionary OldWindowDict t)
-											(MakeWindowHole NewWindowDict)
-											(dictadd WINDOWDICTIONARYDICTIONARY WDDKey NewWindowDict)
-										) ; progn
-									) ; if
-								) ; while
-								(UP)
-							) ; progn
-							(alert "Not part of any window in the window dictionary.")
-						) ; if
-					) ; progn
-					(alert "Selection Error")
-				) ; if
-			) ; progn
+			(ModifyWindow)
 		) ; if it's a window to adjust
 
 		(if (= Ans "Delete")
-			(progn
-				(setq PossWindowEnt (car (entsel "\nPick window to delete: ")))
-				(if PossWindowEnt
-					(progn
-						(setq PossWDDKey (IsEntityPartOfAWindow PossWindowEnt)) ; check to see if it really is a window ;XXX2
-						(if PossWDDKey 
-							(progn ; It is a window entity, so the PossWDDKey IS a WDDKEY
-								(setq WindowDict (ChildDictionary WINDOWDICTIONARYDICTIONARY PossWDDKey))
-								(DeleteWindowAndWindowDictionary WindowDict t)
-								;(dictremove WINDOWDICTIONARYDICTIONARY PossWDDKey)
-								(alert "Window deleted.")
-							) ; progn
-							(alert "Not an entity of a known window")
-						) ; if
-					) ; progn
-					(alert "Entity selection error")
-				) ; if
-			) ; progn
+			(DeleteWindow)
+
 		) ; if
 		
 		(if (= Ans "eXit")
@@ -152,6 +102,69 @@
 	
 ) ; defun
 
+(defun ModifyWindow ()
+
+	(setq PossWindowEnt (car (entsel "\nSelect window:")))
+	(if PossWindowEnt
+		(progn
+			(setq PossWDDKey (IsEntityPartOfAWindow PossWindowEnt)) ; check to see if it really is a window ;XXX2
+			(if PossWDDKey 
+				(progn ; It is a window entity, so the PossWDDKey IS a WDDKEY
+					(setq WDDKey PossWDDKey)
+					(setq WindowDict (cdr (assoc -1 (dictsearch WINDOWDICTIONARYDICTIONARY WDDKey))))
+					(SetUCSToWindowCS WindowDict)
+					(setq Continue2 t)
+					(while Continue2
+						(ToggleSnapsOn)
+						(initget 8 "eXit")
+						(setq PossInputPoint (getpoint "n\Enter another point to adjust the corners of this window or eXit [eXit] <eXit>:"))
+						(ToggleSnapsOff)
+						(if (or (= PossInputPoint "eXit" ) (= PossInputPoint nil))
+							(setq Continue2 nil)
+						) ; if
+						(if (= (type PossInputPoint) 'LIST)
+							(progn
+								(setq OldWindowDict (cdr (assoc -1 (dictsearch WINDOWDICTIONARYDICTIONARY WDDKey))))
+								(setq NewWindowDict (AdjustWindow OldWindowDict (trans PossInputPoint 1 0 nil)))
+								(vlax-ldata-put NewWindowDict "Id" WDDKey)
+								(DeleteWindowAndWindowDictionary OldWindowDict t)
+								(MakeWindowHole NewWindowDict)
+								(dictadd WINDOWDICTIONARYDICTIONARY WDDKey NewWindowDict)
+							) ; progn
+						) ; if
+					) ; while
+					(UP)
+				) ; progn
+				(alert "Not part of any window in the window dictionary.")
+			) ; if
+		) ; progn
+		(alert "Selection Error")
+	) ; if
+	
+) ; defun
+
+(defun DeleteWindow ()
+	
+	(setq PossWindowEnt (car (entsel "\nPick window to delete: ")))
+	(if PossWindowEnt
+		(progn
+			(setq PossWDDKey (IsEntityPartOfAWindow PossWindowEnt)) ; check to see if it really is a window ;XXX2
+			(if PossWDDKey 
+				(progn ; It is a window entity, so the PossWDDKey IS a WDDKEY
+					(setq WindowDict (ChildDictionary WINDOWDICTIONARYDICTIONARY PossWDDKey))
+					(DeleteWindowAndWindowDictionary WindowDict t)
+					;(dictremove WINDOWDICTIONARYDICTIONARY PossWDDKey)
+					(alert "Window deleted.")
+				) ; progn
+				(alert "Not an entity of a known window")
+			) ; if
+		) ; progn
+		(alert "Entity selection error")
+	) ; if
+
+) ; defun
+
+(defun GetAllWalls (ssget "x" (list (cons 8 WALLLAYER))))
 
 ; This function figures out which 3DSolid wall entity the 2D Polyline Rectangle (parameter PLRect) is on, how thick the wall is where
 ; the window is, calls function DrawWindowFromRect with that information and an assumed side of 2D polyline that the
@@ -160,7 +173,8 @@
 ; window on the OTHER side of the 2DPolyline (through the Handedness parameter)
 (defun CreateNewWindowFromRectInWall (PLRect / WindowHole NewWindowDict NewUniqueID Ctr Continue Handedness CurrWallConflictPos CurrWallConflictNeg); WindowGlassEnt)
 
-	(setq AllWalls (ssget "x" (list (cons 8 WALLLAYER))))
+	
+	(setq AllWalls (GetAllWalls))
 	(setq NumWallEntities (sslength AllWalls))
 	(setq Continue t)
 	(setq Ctr 0)
@@ -493,6 +507,7 @@
 	) ; command
 	(command ".union" (handent WallEntHandle) (entlast) "")
 	(UP)
+	
 ) ; defun
 
 
